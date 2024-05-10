@@ -1,186 +1,176 @@
-use std::{error, fmt};
-
-#[derive(Debug, Clone)]
-pub enum StringorByteArray {
-    StringAble(String),
-    NotStringAble(Vec<u8>),
-}
-
-impl From<StringorByteArray> for BencodeElement {
-    fn from(value: StringorByteArray) -> Self {
-        BencodeElement::BencodeString(value)
-    }
-}
-
-impl fmt::Display for StringorByteArray {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            StringorByteArray::StringAble(s) => write!(f, "{}", s),
-            StringorByteArray::NotStringAble(v) => {
-                let mut print_str = String::from("[");
-                for i in v.iter() {
-                    print_str.push_str(format!("{:x}, ", i).as_str())
-                }
-                print_str.pop();
-                print_str.pop();
-                print_str.push(']');
-                write!(f, "{}", print_str)
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-
-pub enum BencodeElement {
-    BencodeInteger(i64),
-    BencodeString(StringorByteArray),
-    BencodeList(Vec<BencodeElement>),
-    BencodeDict(Vec<(BencodeElement, BencodeElement)>),
-}
-
-impl TryInto<i64> for BencodeElement {
-    type Error = &'static str;
-    fn try_into(self) -> Result<i64, Self::Error> {
-        if let BencodeElement::BencodeInteger(x) = self {
-            Ok(x)
-        } else {
-            Err("Cannot parse as i64")
-        }
-    }
-}
-
-impl TryInto<Vec<BencodeElement>> for BencodeElement {
-    type Error = &'static str;
-    fn try_into(self) -> Result<Vec<BencodeElement>, Self::Error> {
-        if let BencodeElement::BencodeList(x) = self {
-            Ok(x)
-        } else {
-            Err("Cannot parse as list")
-        }
-    }
-}
-
-impl TryInto<Vec<u8>> for BencodeElement {
-    type Error = &'static str;
-    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
-        if let BencodeElement::BencodeString(StringorByteArray::NotStringAble(x)) = self {
-            Ok(x)
-        } else {
-            Err("Cannot parse as byte array")
-        }
-    }
-}
-
-impl From<Vec<BencodeElement>> for BencodeElement {
-    fn from(value: Vec<BencodeElement>) -> Self {
-        BencodeElement::BencodeList(value)
-    }
-}
-
-impl From<Vec<(BencodeElement, BencodeElement)>> for BencodeElement {
-    fn from(value: Vec<(BencodeElement, BencodeElement)>) -> Self {
-        BencodeElement::BencodeDict(value)
-    }
-}
-
-impl fmt::Display for BencodeElement {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::BencodeInteger(x) => {
-                write!(f, "{}", x)
-            }
-            Self::BencodeString(x) => {
-                write!(f, "\"{}\"", x)
-            }
-
-            Self::BencodeDict(x) => {
-                let mut print_str = String::from('{');
-                for (key, value) in x.iter() {
-                    print_str.push_str(format!(" {} : {},", key, value).as_str());
-                }
-                print_str.pop();
-                print_str.push_str(" }");
-                write!(f, "{}", print_str)
-            }
-            Self::BencodeList(x) => {
-                let mut print_str = String::from("[");
-                for i in x.iter() {
-                    print_str.push_str(format!("{}, ", i).as_str())
-                }
-                print_str.pop();
-                print_str.pop();
-                print_str.push(']');
-                write!(f, "{}", print_str)
-            }
-        }
-    }
-}
-
-pub enum BencodeError {
-    ParseStringError(String, String),
-    ParseIntgerError(String, String),
-    ParseListError(String, String),
-    ParseDictError(String, String),
-    InvalidElementError(String, String),
-}
-
-impl fmt::Display for BencodeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::ParseStringError(x, y) => {
-                write!(f, "Failed to Parse Bencode String: {} in {}", x, y)
-            }
-            Self::ParseIntgerError(x, y) => {
-                write!(f, "Failed to Parse Bencode Integer: {} in {}", x, y)
-            }
-            Self::ParseListError(x, y) => {
-                write!(f, "Failed to Parse Bencode List: {} in {}", x, y)
-            }
-            Self::ParseDictError(x, y) => {
-                write!(f, "Failed to Parse Bencode Dict: {} in {}", x, y)
-            }
-            Self::InvalidElementError(x, y) => {
-                write!(f, "Invalid Element: {} in {}", x, y)
-            }
-        }
-    }
-}
-
-impl fmt::Debug for BencodeError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::ParseStringError(x, y) => {
-                write!(f, "Failed to Parse Bencode String: {} in {}", x, y)
-            }
-            Self::ParseIntgerError(x, y) => {
-                write!(f, "Failed to Parse Bencode Integer: {} in {}", x, y)
-            }
-            Self::ParseListError(x, y) => {
-                write!(f, "Failed to Parse Bencode List: {} in {}", x, y)
-            }
-            Self::ParseDictError(x, y) => {
-                write!(f, "Failed to Parse Bencode Dict: {} in {}", x, y)
-            }
-            Self::InvalidElementError(x, y) => {
-                write!(f, "Invalid Element: {} in {}", x, y)
-            }
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test() {
-        // let str = "li32e";
-        // assert_eq!("i32e", &str[1..=4]);
-        assert_eq!(65u8, b'a');
-    }
-}
+use std::fmt;
 
 pub mod decode {
     use super::*;
+    #[derive(Debug, Clone)]
+    pub enum StringorByteArray {
+        StringAble(String),
+        NotStringAble(Vec<u8>),
+    }
+
+    impl From<StringorByteArray> for BencodeElement {
+        fn from(value: StringorByteArray) -> Self {
+            BencodeElement::BencodeString(value)
+        }
+    }
+
+    impl fmt::Display for StringorByteArray {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                StringorByteArray::StringAble(s) => write!(f, "{}", s),
+                StringorByteArray::NotStringAble(v) => {
+                    let mut print_str = String::from("[");
+                    for i in v.iter() {
+                        print_str.push_str(format!("{:x}, ", i).as_str())
+                    }
+                    print_str.pop();
+                    print_str.pop();
+                    print_str.push(']');
+                    write!(f, "{}", print_str)
+                }
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+
+    pub enum BencodeElement {
+        BencodeInteger(i64),
+        BencodeString(StringorByteArray),
+        BencodeList(Vec<BencodeElement>),
+        BencodeDict(Vec<(BencodeElement, BencodeElement)>),
+    }
+
+    impl TryInto<i64> for BencodeElement {
+        type Error = ();
+        fn try_into(self) -> std::result::Result<i64, Self::Error> {
+            if let BencodeElement::BencodeInteger(x) = self {
+                Ok(x)
+            } else {
+                Err(())
+            }
+        }
+    }
+
+    impl TryInto<Vec<BencodeElement>> for BencodeElement {
+        type Error = &'static str;
+        fn try_into(self) -> std::result::Result<Vec<BencodeElement>, Self::Error> {
+            if let BencodeElement::BencodeList(x) = self {
+                Ok(x)
+            } else {
+                Err("Cannot parse as list")
+            }
+        }
+    }
+
+    impl TryInto<Vec<u8>> for BencodeElement {
+        type Error = &'static str;
+        fn try_into(self) -> std::result::Result<Vec<u8>, Self::Error> {
+            if let BencodeElement::BencodeString(StringorByteArray::NotStringAble(x)) = self {
+                Ok(x)
+            } else {
+                Err("Cannot parse as byte array")
+            }
+        }
+    }
+
+    impl From<Vec<BencodeElement>> for BencodeElement {
+        fn from(value: Vec<BencodeElement>) -> Self {
+            BencodeElement::BencodeList(value)
+        }
+    }
+
+    impl From<Vec<(BencodeElement, BencodeElement)>> for BencodeElement {
+        fn from(value: Vec<(BencodeElement, BencodeElement)>) -> Self {
+            BencodeElement::BencodeDict(value)
+        }
+    }
+
+    impl fmt::Display for BencodeElement {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                Self::BencodeInteger(x) => {
+                    write!(f, "{}", x)
+                }
+                Self::BencodeString(x) => {
+                    write!(f, "\"{}\"", x)
+                }
+
+                Self::BencodeDict(x) => {
+                    let mut print_str = String::from('{');
+                    for (key, value) in x.iter() {
+                        print_str.push_str(format!(" {} : {},", key, value).as_str());
+                    }
+                    print_str.pop();
+                    print_str.push_str(" }");
+                    write!(f, "{}", print_str)
+                }
+                Self::BencodeList(x) => {
+                    let mut print_str = String::from("[");
+                    for i in x.iter() {
+                        print_str.push_str(format!("{}, ", i).as_str())
+                    }
+                    print_str.pop();
+                    print_str.pop();
+                    print_str.push(']');
+                    write!(f, "{}", print_str)
+                }
+            }
+        }
+    }
+
+    pub enum BencodeError {
+        ParseStringError(String, String),
+        ParseIntgerError(String, String),
+        ParseListError(String, String),
+        ParseDictError(String, String),
+        InvalidElementError(String, String),
+    }
+
+    impl fmt::Display for BencodeError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                Self::ParseStringError(x, y) => {
+                    write!(f, "Failed to Parse Bencode String: {} in {}", x, y)
+                }
+                Self::ParseIntgerError(x, y) => {
+                    write!(f, "Failed to Parse Bencode Integer: {} in {}", x, y)
+                }
+                Self::ParseListError(x, y) => {
+                    write!(f, "Failed to Parse Bencode List: {} in {}", x, y)
+                }
+                Self::ParseDictError(x, y) => {
+                    write!(f, "Failed to Parse Bencode Dict: {} in {}", x, y)
+                }
+                Self::InvalidElementError(x, y) => {
+                    write!(f, "Invalid Element: {} in {}", x, y)
+                }
+            }
+        }
+    }
+
+    impl fmt::Debug for BencodeError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                Self::ParseStringError(x, y) => {
+                    write!(f, "Failed to Parse Bencode String: {} in {}", x, y)
+                }
+                Self::ParseIntgerError(x, y) => {
+                    write!(f, "Failed to Parse Bencode Integer: {} in {}", x, y)
+                }
+                Self::ParseListError(x, y) => {
+                    write!(f, "Failed to Parse Bencode List: {} in {}", x, y)
+                }
+                Self::ParseDictError(x, y) => {
+                    write!(f, "Failed to Parse Bencode Dict: {} in {}", x, y)
+                }
+                Self::InvalidElementError(x, y) => {
+                    write!(f, "Invalid Element: {} in {}", x, y)
+                }
+            }
+        }
+    }
+
     type Result<T> = core::result::Result<T, BencodeError>;
 
     fn vectorslice_to_string(value: &[u8]) -> String {
