@@ -39,10 +39,10 @@ pub enum BencodeElement {
     BencodeDict(Vec<(BencodeElement, BencodeElement)>),
 }
 
-impl TryFrom<BencodeElement> for i64 {
+impl TryInto<i64> for BencodeElement {
     type Error = &'static str;
-    fn try_from(value: BencodeElement) -> Result<Self, Self::Error> {
-        if let BencodeElement::BencodeInteger(x) = value {
+    fn try_into(self) -> Result<i64, Self::Error> {
+        if let BencodeElement::BencodeInteger(x) = self {
             Ok(x)
         } else {
             Err("Cannot parse as i64")
@@ -50,10 +50,10 @@ impl TryFrom<BencodeElement> for i64 {
     }
 }
 
-impl TryFrom<BencodeElement> for Vec<BencodeElement> {
+impl TryInto<Vec<BencodeElement>> for BencodeElement {
     type Error = &'static str;
-    fn try_from(value: BencodeElement) -> Result<Self, Self::Error> {
-        if let BencodeElement::BencodeList(x) = value {
+    fn try_into(self) -> Result<Vec<BencodeElement>, Self::Error> {
+        if let BencodeElement::BencodeList(x) = self {
             Ok(x)
         } else {
             Err("Cannot parse as list")
@@ -61,10 +61,10 @@ impl TryFrom<BencodeElement> for Vec<BencodeElement> {
     }
 }
 
-impl TryFrom<BencodeElement> for Vec<u8> {
+impl TryInto<Vec<u8>> for BencodeElement {
     type Error = &'static str;
-    fn try_from(value: BencodeElement) -> Result<Self, Self::Error> {
-        if let BencodeElement::BencodeString(StringorByteArray::NotStringAble(x)) = value {
+    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
+        if let BencodeElement::BencodeString(StringorByteArray::NotStringAble(x)) = self {
             Ok(x)
         } else {
             Err("Cannot parse as byte array")
