@@ -1,7 +1,7 @@
+use std::collections::HashMap;
 use std::fmt;
 
 pub mod bencode {
-    use std::collections::HashMap;
 
     use super::*;
     #[derive(Debug, Clone)]
@@ -345,5 +345,23 @@ pub mod bencode {
 
     pub fn decode_bencode_element(bencode_str: Vec<u8>) -> Result<BencodeElement> {
         Ok(decoder_internal(&bencode_str[..])?.1)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+
+    use crate::bencode::{decode_bencode_element, BencodeElement};
+
+    #[test]
+    fn test() {
+        let V: Vec<u8> = "d5:helloi5ee".as_bytes().to_vec();
+        let x: HashMap<String, BencodeElement> =
+            decode_bencode_element(V).unwrap().try_into().unwrap();
+        assert_eq!(
+            <BencodeElement as TryInto<i64>>::try_into(x.get("hello").unwrap().clone()).unwrap(),
+            5
+        );
     }
 }
