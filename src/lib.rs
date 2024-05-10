@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{error, fmt};
 
 #[derive(Debug, Clone)]
 pub enum StringorByteArray {
@@ -37,6 +37,39 @@ pub enum BencodeElement {
     BencodeString(StringorByteArray),
     BencodeList(Vec<BencodeElement>),
     BencodeDict(Vec<(BencodeElement, BencodeElement)>),
+}
+
+impl TryFrom<BencodeElement> for i64 {
+    type Error = &'static str;
+    fn try_from(value: BencodeElement) -> Result<Self, Self::Error> {
+        if let BencodeElement::BencodeInteger(x) = value {
+            Ok(x)
+        } else {
+            Err("Cannot parse as i64")
+        }
+    }
+}
+
+impl TryFrom<BencodeElement> for Vec<BencodeElement> {
+    type Error = &'static str;
+    fn try_from(value: BencodeElement) -> Result<Self, Self::Error> {
+        if let BencodeElement::BencodeList(x) = value {
+            Ok(x)
+        } else {
+            Err("Cannot parse as list")
+        }
+    }
+}
+
+impl TryFrom<BencodeElement> for Vec<u8> {
+    type Error = &'static str;
+    fn try_from(value: BencodeElement) -> Result<Self, Self::Error> {
+        if let BencodeElement::BencodeString(StringorByteArray::NotStringAble(x)) = value {
+            Ok(x)
+        } else {
+            Err("Cannot parse as byte array")
+        }
+    }
 }
 
 impl From<Vec<BencodeElement>> for BencodeElement {
