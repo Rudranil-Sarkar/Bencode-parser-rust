@@ -1,6 +1,8 @@
 use std::fmt;
 
 pub mod bencode {
+    use std::collections::HashMap;
+
     use super::*;
     #[derive(Debug, Clone)]
     pub enum StringorByteArray {
@@ -39,6 +41,25 @@ pub mod bencode {
         BencodeString(StringorByteArray),
         BencodeList(Vec<BencodeElement>),
         BencodeDict(Vec<(BencodeElement, BencodeElement)>),
+    }
+
+    impl TryInto<HashMap<String, BencodeElement>> for BencodeElement {
+        type Error = ();
+        fn try_into(
+            self,
+        ) -> std::prelude::v1::Result<HashMap<String, BencodeElement>, Self::Error> {
+            let mut map = HashMap::<String, BencodeElement>::new();
+            if let BencodeElement::BencodeDict(x) = self {
+                for (key, value) in x {
+                    let key: String = key.try_into().unwrap();
+                    map.insert(key, value);
+                }
+
+                Ok(map)
+            } else {
+                Err(())
+            }
+        }
     }
 
     impl TryInto<i64> for BencodeElement {
