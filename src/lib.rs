@@ -52,6 +52,16 @@ pub mod bencode {
         }
     }
 
+    impl TryInto<String> for BencodeElement {
+        type Error = &'static str;
+        fn try_into(self) -> std::result::Result<String, Self::Error> {
+            if let BencodeElement::BencodeString(StringorByteArray::StringAble(x)) = self {
+                Ok(x)
+            } else {
+                Err("Cannot parse as byte array")
+            }
+        }
+    }
     impl TryInto<Vec<BencodeElement>> for BencodeElement {
         type Error = &'static str;
         fn try_into(self) -> std::result::Result<Vec<BencodeElement>, Self::Error> {
