@@ -1,6 +1,6 @@
 use std::fmt;
 
-pub mod decode {
+pub mod becnode {
     use super::*;
     #[derive(Debug, Clone)]
     pub enum StringorByteArray {
