@@ -40,21 +40,13 @@ pub mod bencode {
         BencodeInteger(i64),
         BencodeString(StringorByteArray),
         BencodeList(Vec<BencodeElement>),
-        BencodeDict(Vec<(BencodeElement, BencodeElement)>),
+        BencodeDict(HashMap<String, BencodeElement>),
     }
 
     impl TryInto<HashMap<String, BencodeElement>> for BencodeElement {
         type Error = ();
-        fn try_into(
-            self,
-        ) -> std::prelude::v1::Result<HashMap<String, BencodeElement>, Self::Error> {
-            let mut map = HashMap::<String, BencodeElement>::new();
-            if let BencodeElement::BencodeDict(x) = self {
-                for (key, value) in x {
-                    let key: String = key.try_into().unwrap();
-                    map.insert(key, value);
-                }
-
+        fn try_into(self) -> std::result::Result<HashMap<String, BencodeElement>, Self::Error> {
+            if let BencodeElement::BencodeDict(map) = self {
                 Ok(map)
             } else {
                 Err(())
@@ -108,12 +100,6 @@ pub mod bencode {
     impl From<Vec<BencodeElement>> for BencodeElement {
         fn from(value: Vec<BencodeElement>) -> Self {
             BencodeElement::BencodeList(value)
-        }
-    }
-
-    impl From<Vec<(BencodeElement, BencodeElement)>> for BencodeElement {
-        fn from(value: Vec<(BencodeElement, BencodeElement)>) -> Self {
-            BencodeElement::BencodeDict(value)
         }
     }
 
@@ -295,11 +281,11 @@ pub mod bencode {
                 ))
             }
             b'd' => {
-                let mut res: Vec<(BencodeElement, BencodeElement)> = Vec::new();
+                let mut res: HashMap<String, BencodeElement> = HashMap::new();
                 let mut rest = bencode_str.split_at(1).1;
                 let mut total_parsed_len = 1;
 
-                let mut key: Option<BencodeElement> = None;
+                let mut key: Option<String> = None;
 
                 while !rest.is_empty() && rest[0] != b'e' {
                     let (parsed, bencoded_value) = decoder_internal(rest)?;
@@ -309,12 +295,12 @@ pub mod bencode {
 
                     match key.clone() {
                         Some(x) => {
-                            res.push((x, bencoded_value));
+                            res.insert(x, bencoded_value);
                             key = None
                         }
                         None => match bencoded_value {
-                            BencodeElement::BencodeString(_) => {
-                                key = Some(bencoded_value);
+                            BencodeElement::BencodeString(StringorByteArray::StringAble(s)) => {
+                                key = Some(s);
                             }
 
                             _ => {
