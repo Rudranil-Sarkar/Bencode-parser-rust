@@ -1,5 +1,5 @@
 pub mod bencode {
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
     use std::fmt;
 
     pub enum BencodeError {
@@ -53,13 +53,14 @@ pub mod bencode {
             }
         }
     }
-    // Start of Decoding Logic
-    // -------------------------------------------------------------------------------------------------
+
     #[derive(Debug, Clone)]
     pub enum StringorByteArray {
         StringAble(String),
         NotStringAble(Vec<u8>),
     }
+    // Start of Decoding Logic
+    // -------------------------------------------------------------------------------------------------
 
     impl From<StringorByteArray> for BencodeElement {
         fn from(value: StringorByteArray) -> Self {
@@ -91,12 +92,12 @@ pub mod bencode {
         BencodeInteger(i64),
         BencodeString(StringorByteArray),
         BencodeList(Vec<BencodeElement>),
-        BencodeDict(HashMap<String, BencodeElement>),
+        BencodeDict(BTreeMap<String, BencodeElement>),
     }
 
-    impl TryInto<HashMap<String, BencodeElement>> for BencodeElement {
+    impl TryInto<BTreeMap<String, BencodeElement>> for BencodeElement {
         type Error = ();
-        fn try_into(self) -> std::result::Result<HashMap<String, BencodeElement>, Self::Error> {
+        fn try_into(self) -> std::result::Result<BTreeMap<String, BencodeElement>, Self::Error> {
             if let BencodeElement::BencodeDict(map) = self {
                 Ok(map)
             } else {
@@ -280,7 +281,7 @@ pub mod bencode {
                 ))
             }
             b'd' => {
-                let mut res: HashMap<String, BencodeElement> = HashMap::new();
+                let mut res: BTreeMap<String, BencodeElement> = BTreeMap::new();
                 let mut rest = bencode_str.split_at(1).1;
                 let mut total_parsed_len = 1;
 
@@ -288,7 +289,6 @@ pub mod bencode {
 
                 while !rest.is_empty() && rest[0] != b'e' {
                     let (parsed, bencoded_value) = decoder_internal(rest)?;
-                    // println!("{}", parsed);
                     rest = &rest[parsed.len()..];
                     total_parsed_len += parsed.len();
 
@@ -340,9 +340,9 @@ pub mod bencode {
 
     pub enum BencodeEncodeble {
         Number(i64),
-        String(String),
+        String(StringorByteArray),
         List(Vec<BencodeEncodeble>),
-        Dict(HashMap<String, BencodeEncodeble>),
+        Dict(BTreeMap<String, BencodeEncodeble>),
     }
 
     impl Into<BencodeEncodeble> for i64 {
@@ -351,15 +351,27 @@ pub mod bencode {
         }
     }
 
+    impl Into<StringorByteArray> for String {
+        fn into(self) -> StringorByteArray {
+            StringorByteArray::StringAble(self)
+        }
+    }
+
+    impl Into<StringorByteArray> for Vec<u8> {
+        fn into(self) -> StringorByteArray {
+            StringorByteArray::NotStringAble(self)
+        }
+    }
+
     impl Into<BencodeEncodeble> for &str {
         fn into(self) -> BencodeEncodeble {
-            BencodeEncodeble::String(self.to_string())
+            BencodeEncodeble::String(self.to_string().into())
         }
     }
 
     impl Into<BencodeEncodeble> for String {
         fn into(self) -> BencodeEncodeble {
-            BencodeEncodeble::String(self)
+            BencodeEncodeble::String(self.into())
         }
     }
 
@@ -369,7 +381,7 @@ pub mod bencode {
         }
     }
 
-    impl Into<BencodeEncodeble> for HashMap<String, BencodeEncodeble> {
+    impl Into<BencodeEncodeble> for BTreeMap<String, BencodeEncodeble> {
         fn into(self) -> BencodeEncodeble {
             BencodeEncodeble::Dict(self)
         }
@@ -379,31 +391,44 @@ pub mod bencode {
         format!("i{}e", i)
     }
 
-    fn encode_string_bencode(s: &str) -> String {
-        format!("{}:{}", s.len(), s)
+    fn encode_string_bencode(s: &Vec<u8>) -> Vec<u8> {
+        let mut len = s.len().to_string();
+        let mut res_vec: Vec<u8> = Vec::new();
+        len.push(':');
+
+        res_vec.extend(len.bytes());
+        res_vec.extend(s);
+        res_vec
     }
 
-    pub fn encode_bencode_value(value: &BencodeEncodeble) -> Result<String> {
+    pub fn encode_bencode_value(value: &BencodeEncodeble) -> Result<Vec<u8>> {
         match value {
-            BencodeEncodeble::Number(num) => Ok(encode_integer_bencode(*num)),
-            BencodeEncodeble::String(str) => Ok(encode_string_bencode(str)),
+            BencodeEncodeble::Number(num) => Ok(encode_integer_bencode(*num).as_bytes().to_vec()),
+            BencodeEncodeble::String(str) => {
+                let mut arg: Vec<u8>;
+                match str {
+                    StringorByteArray::NotStringAble(v) => arg = v.clone(),
+                    StringorByteArray::StringAble(s) => arg = s.as_bytes().to_vec(),
+                }
+                Ok(encode_string_bencode(&arg))
+            }
             BencodeEncodeble::List(lst) => {
-                let mut res_str: String = String::from("l");
+                let mut res_str: Vec<u8> = Vec::from("l".as_bytes());
                 for i in lst {
-                    res_str.push_str(&encode_bencode_value(i)?)
+                    res_str.extend(&encode_bencode_value(i)?)
                 }
 
-                res_str.push('e');
+                res_str.push(b'e');
 
                 Ok(res_str)
             }
             BencodeEncodeble::Dict(dict) => {
-                let mut res_str = String::from("d");
+                let mut res_str = Vec::from("d".as_bytes());
                 for (key, value) in dict.iter() {
-                    res_str.push_str(encode_bencode_value(&key.clone().into())?.as_str());
-                    res_str.push_str(encode_bencode_value(value)?.as_str())
+                    res_str.extend(encode_bencode_value(&key.clone().into())?);
+                    res_str.extend(encode_bencode_value(value)?)
                 }
-                res_str.push('e');
+                res_str.push(b'e');
                 Ok(res_str)
             }
         }
@@ -415,9 +440,9 @@ pub mod bencode {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
-    use crate::bencode::BencodeEncodeble;
+    use crate::bencode::{encode_bencode_value, BencodeEncodeble};
 
     use super::*;
 
@@ -432,17 +457,25 @@ mod test {
             vec![5.into(), 6.into(), vec![7.into(), 8.into()].into()].into(),
         ];
 
-        let mut dict: HashMap<String, BencodeEncodeble> = HashMap::new();
+        let mut dict: BTreeMap<String, BencodeEncodeble> = BTreeMap::new();
 
-        dict.insert("test".to_string(), lst.into());
-        let mut dict2: HashMap<String, BencodeEncodeble> = HashMap::new();
+        let mut dict2: BTreeMap<String, BencodeEncodeble> = BTreeMap::new();
         dict2.insert("hello".to_string(), 123.into());
         dict.insert("test2".to_string(), dict2.into());
+        dict.insert("test".to_string(), lst.into());
 
         let str = bencode::encode_bencode_value(&dict.into()).unwrap();
         assert_eq!(
             str,
             "d4:testli1ei2ei3eli4ei5ee5:Helloli5ei6eli7ei8eeee5:test2d5:helloi123eee"
+                .bytes()
+                .collect::<Vec<u8>>()
         )
+
+        // let str = "hellohello";
+        // assert_eq!(
+        //     encode_bencode_value(&str.into()).unwrap(),
+        //     "10:hellohello".as_bytes().to_vec()
+        // )
     }
 }
