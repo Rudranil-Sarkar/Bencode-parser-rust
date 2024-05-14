@@ -345,6 +345,12 @@ pub mod bencode {
         Dict(BTreeMap<String, BencodeEncodeble>),
     }
 
+    impl Into<BencodeEncodeble> for Vec<u8> {
+        fn into(self) -> BencodeEncodeble {
+            BencodeEncodeble::String(StringorByteArray::NotStringAble(self))
+        }
+    }
+
     impl Into<BencodeEncodeble> for i64 {
         fn into(self) -> BencodeEncodeble {
             BencodeEncodeble::Number(self)
@@ -378,6 +384,37 @@ pub mod bencode {
     impl Into<BencodeEncodeble> for Vec<BencodeEncodeble> {
         fn into(self) -> BencodeEncodeble {
             BencodeEncodeble::List(self)
+        }
+    }
+
+    impl From<BTreeMap<String, BencodeElement>> for BencodeEncodeble {
+        fn from(value: BTreeMap<String, BencodeElement>) -> Self {
+            let mut map: BTreeMap<String, BencodeEncodeble> = BTreeMap::new();
+            for i in value {
+                map.insert(i.0, i.1.into());
+            }
+            BencodeEncodeble::Dict(map)
+        }
+    }
+
+    impl From<Vec<BencodeElement>> for BencodeEncodeble {
+        fn from(value: Vec<BencodeElement>) -> Self {
+            let mut lst: Vec<BencodeEncodeble> = Vec::new();
+            for i in value {
+                lst.push(i.into());
+            }
+            BencodeEncodeble::List(lst)
+        }
+    }
+
+    impl Into<BencodeEncodeble> for BencodeElement {
+        fn into(self) -> BencodeEncodeble {
+            match self {
+                BencodeElement::BencodeDict(dict) => dict.into(),
+                BencodeElement::BencodeInteger(int) => BencodeEncodeble::Number(int),
+                BencodeElement::BencodeList(lst) => lst.into(),
+                BencodeElement::BencodeString(str) => BencodeEncodeble::String(str),
+            }
         }
     }
 
@@ -440,13 +477,29 @@ pub mod bencode {
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, fs};
 
     use crate::bencode::{encode_bencode_value, BencodeEncodeble};
+
+    use self::bencode::{decode_bencode_element, BencodeElement};
 
     use super::*;
 
     #[test]
+    fn test2() {
+        let file_bytes = std::fs::read("sample.torrent").unwrap();
+
+        let decoded = decode_bencode_element(file_bytes).unwrap();
+
+        let test: Vec<BencodeEncodeble> = vec![1.into(), 2.into(), 3.into()].into();
+
+        let x: BTreeMap<String, BencodeElement> = decoded.try_into().unwrap();
+        let encoded = bencode::encode_bencode_value(&x.into()).unwrap();
+        fs::write("sample.torrent.gen", encoded).unwrap();
+        assert!(true)
+    }
+
+    // #[test]
     fn test() {
         let lst: Vec<BencodeEncodeble> = vec![
             1.into(),
